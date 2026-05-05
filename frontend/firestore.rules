@@ -1,0 +1,196 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isWorker() {
+      return isAuthenticated() && request.auth.token.role == 'worker';
+    }
+    
+    function isDoctor() {
+      return isAuthenticated() && request.auth.token.role == 'doctor';
+    }
+    
+    function isPatient() {
+      return isAuthenticated() && request.auth.token.role == 'patient';
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.role == 'admin';
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      // Users can read their own data
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Only admins can create users (via backend)
+      allow create: if isAdmin();
+      
+      // Users can update their own profile
+      allow update: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Patients collection
+    match /patients/{patientId} {
+      // Workers can create patients
+      allow create: if isWorker();
+      
+      // Workers can read patients they created
+      allow read: if isWorker() && resource.data.createdByWorkerId == request.auth.uid;
+      
+      // Doctors can read all patients
+      allow read: if isDoctor();
+      
+      // Patients can read their own data
+      allow read: if isPatient() && resource.data.linkedUserId == request.auth.uid;
+      
+      // Workers can update patients they created
+      allow update: if isWorker() && resource.data.createdByWorkerId == request.auth.uid;
+      
+      // Doctors can update patients
+      allow update: if isDoctor();
+    }
+    
+    // Visits collection
+    match /visits/{visitId} {
+      // Workers can create visits
+      allow create: if isWorker();
+      
+      // Workers can read their own visits
+      allow read: if isWorker() && resource.data.workerId == request.auth.uid;
+      
+      // Doctors can read all visits
+      allow read: if isDoctor();
+      
+      // Workers can update their visits
+      allow update: if isWorker() && resource.data.workerId == request.auth.uid;
+    }
+    
+    // Triage Results collection
+    match /triageResults/{triageId} {
+      // System/Backend creates triage results
+      allow create: if isWorker() || isDoctor();
+      
+      // Workers can read their triage results
+      allow read: if isWorker() && resource.data.workerId == request.auth.uid;
+      
+      // Doctors can read all triage results
+      allow read: if isDoctor();
+      
+      // No updates allowed (immutable)
+      allow update: if false;
+    }
+    
+    // Referrals collection
+    match /referrals/{referralId} {
+      // Workers can create referrals
+      allow create: if isWorker();
+      
+      // Workers can read referrals they created
+      allow read: if isWorker() && resource.data.workerId == request.auth.uid;
+      
+      // Doctors can read referrals assigned to them
+      allow read: if isDoctor() && resource.data.doctorId == request.auth.uid;
+      
+      // Doctors can read all referrals
+      allow read: if isDoctor();
+      
+      // Doctors can update referral status
+      allow update: if isDoctor() && resource.data.doctorId == request.auth.uid;
+    }
+    
+    // Clinical Notes collection
+    match /clinicalNotes/{noteId} {
+      // Doctors can create clinical notes
+      allow create: if isDoctor();
+      
+      // Doctors can read their notes
+      allow read: if isDoctor() && resource.data.doctorId == request.auth.uid;
+      
+      // Workers can read notes for their patients
+      allow read: if isWorker();
+      
+      // Doctors can update their own notes
+      allow update: if isDoctor() && resource.data.doctorId == request.auth.uid;
+    }
+    
+    // Care Plans collection
+    match /carePlans/{carePlanId} {
+      // Doctors and workers can create care plans
+      allow create: if isDoctor() || isWorker();
+      
+      // Workers and doctors can read care plans
+      allow read: if isWorker() || isDoctor();
+      
+      // Patients can read their care plans
+      allow read: if isPatient();
+      
+      // Doctors can update care plans
+      allow update: if isDoctor();
+    }
+    
+    // Follow-ups collection
+    match /followUps/{followUpId} {
+      // Workers can create follow-ups
+      allow create: if isWorker();
+      
+      // Workers can read follow-ups assigned to them
+      allow read: if isWorker() && resource.data.assignedWorkerId == request.auth.uid;
+      
+      // Doctors can read all follow-ups
+      allow read: if isDoctor();
+      
+      // Patients can read their follow-ups
+      allow read: if isPatient();
+      
+      // Workers can update their follow-ups
+      allow update: if isWorker() && resource.data.assignedWorkerId == request.auth.uid;
+    }
+    
+    // Alerts collection
+    match /alerts/{alertId} {
+      // System creates alerts
+      allow create: if isWorker() || isDoctor();
+      
+      // Workers can read alerts assigned to them
+      allow read: if isWorker() && resource.data.assignedUserId == request.auth.uid;
+      
+      // Doctors can read all alerts
+      allow read: if isDoctor();
+      
+      // Patients can read their alerts
+      allow read: if isPatient() && resource.data.patientId == request.auth.uid;
+      
+      // Workers and doctors can update alerts
+      allow update: if isWorker() || isDoctor();
+    }
+    
+    // Reports collection
+    match /reports/{reportId} {
+      // Workers and doctors can create reports
+      allow create: if isWorker() || isDoctor();
+      
+      // Workers can read reports for their patients
+      allow read: if isWorker();
+      
+      // Doctors can read all reports
+      allow read: if isDoctor();
+      
+      // Patients can read their reports
+      allow read: if isPatient();
+      
+      // No updates (immutable)
+      allow update: if false;
+    }
+    
+    // Default: deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
