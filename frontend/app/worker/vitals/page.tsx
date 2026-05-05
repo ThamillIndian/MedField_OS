@@ -274,7 +274,7 @@ export default function VitalsPage() {
               </div>
 
               {/* Submit Buttons */}
-              <div className="flex justify-end gap-4 pt-4">
+              <div className="flex flex-col sm:flex-row justify-end gap-4 pt-4">
                 <Button
                   type="button"
                   variant="secondary"
@@ -282,6 +282,18 @@ export default function VitalsPage() {
                   disabled={loading}
                 >
                   Back
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    if (!validateVitals()) return;
+                    sessionStorage.setItem('currentVitals', JSON.stringify(vitals));
+                    router.push('/worker/triage-result');
+                  }}
+                  disabled={loading}
+                >
+                  Skip to Triage (Demo)
                 </Button>
                 <Button
                   type="submit"
